@@ -12,52 +12,94 @@ training_data = datasets.CIFAR10(
     transform=ToTensor()
 )
 
-# What is batch size? TODO: Look tha shit up.
+test_data = datasets.CIFAR10(
+    root="data",
+    train=False,
+    download=True,
+    transform=ToTensor()
+)
+
 batch_size = 64
 
 train_dataloader = DataLoader(training_data, batch_size=batch_size)
+test_dataloader = DataLoader(test_data, batch_size=batch_size)
+
+for X, y in test_dataloader:
+    print(f"Shape of X [N, C, H, W]: {X.shape}")
+    print(f"Shape of y: {y.shape} {y.dtype}")
+    break
+
+device = "cpu"
 
 
 class cifar_NN(nn.Module):
-    def __init__(self,
-                 input_features: int,
-                 hidden_layer_features: list[int],
-                 output_features: int,
-                 activation_function: function):
+    def __init__(self):
         super().__init__()
-
-        # We want to make sure that the layers entered are valid before we create them
-        if (input_features < 1):
-            raise Exception(
-                "The neural network needs at least one input feature")
-        if (len(hidden_layer_features) < 1):
-            raise Exception(
-                "The neural network needs at least one hidden layer")
-
-        # We want to keep track of all our layers :)
-        self.layers = []
-
-        self.layers[0] = nn.Linear(input_features, hidden_layer_features[0])
-        self.add_module("input_layer", self.layers[0])
-        for i in range(1, len(hidden_layer_features)):
-            self.layers.append(
-                nn.Linear(hidden_layer_features[i - 1], hidden_layer_features[i]))
-            self.add_module(f"hidden_layer{i}", self.layers[i])
-
-        # Set the output layer
-        self.out = nn.Linear(hidden_layer_features[-1], output_features)
-
-        self.activation = activation_function
+        self.flatten = nn.Flatten()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(3*32*32, 512),
+            nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 10)
+        )
 
     def forward(self, x):
-        for i in range(len(self.layers)):
-            x = self.activation(self.layers[i](x))
-        return self.out(x)
+        x = self.flatten(x)
+        logits = self.linear_relu_stack(x)
+        return logits
 
 
-# Instantiate the model
-classifier = cifar_NN(input_features=4,
-                      hidden_layer_features=[16, 8],
-                      output_features=3,
-                      activation_function=nn.ReLU
-                      )
+model = cifar_NN().to(device)
+print(model)
+
+loss_fn = nn.CrossEntropyLoss()
+optimiser = torch.optim.SGD(model.parameters(), lr=1e-2)
+
+
+def train(dataloader, model, loss_fn, optimiser):
+    size = len(dataloader.dataset)
+    model.train()
+    for batch, (X, y) in enumerate(dataloader):
+        X, y = X.to(device), y.to(device)
+
+        # Compute prediction error
+        pred = model(X)
+        loss = loss_fn(pred, y)
+
+        # Backpropagation
+        loss.backward()
+        optimiser.step()
+        optimiser.zero_grad()
+
+        if batch % 100 == 0:
+            loss, current = loss.item(), (batch + 1) * len(X)
+            print(f"Loss: {loss:7f} [{current:>5d}/{size:>5d}]")
+
+
+def test(dataloader, model, loss_fn):
+    size = len(dataloader.dataset)
+    num_batches = len(dataloader)
+    model.eval()
+    test_loss, correct = 0, 0
+    with torch.no_grad():
+        for X, y in dataloader:
+            X, y = X.to(device), y.to(device)
+            pred = model(X)
+            test_loss += loss_fn(pred, y).item()
+            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+    test_loss /= num_batches
+    correct /= size
+    print(
+        f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss:{test_loss:>8f} \n")
+
+
+epochs = 5
+for t in range(epochs):
+    print(f"Epoch {t+1}\n----------------------------")
+    train(train_dataloader, model, loss_fn, optimiser)
+    test(test_dataloader, model, loss_fn)
+print("Done!")
+
+torch.save(model.state_dict(), "model.pth")
+print("Saved PyTorch Model State to model.pth")
