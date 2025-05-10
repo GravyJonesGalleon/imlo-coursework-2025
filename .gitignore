@@ -3,3 +3,5 @@ data/
 
 __pycache__
 ./assessment_utils/__pycache__/
+
+./model.pth
