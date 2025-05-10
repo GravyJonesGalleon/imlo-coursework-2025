@@ -1,2 +1,5 @@
 # Ignore the data files
 data/
+
+__pycache__
+./assessment_utils/__pycache__/
