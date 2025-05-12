@@ -1,18 +1,25 @@
 # This is an initialisation file used to setup constants used in both training and testing.
 import torch
 from torch import nn
-
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
 
 #################################
+#       Hyperparameters
+#################################
+
+batch_size = 4
+loss_fn = nn.CrossEntropyLoss()
+learning_rate = 1e-3
+epochs = 30
+
+
+#################################
 #            Datasets
 #################################
 
-
-batch_size = 64
 
 # We want to use the CIFAR-10 dataset to train the data.
 training_data = datasets.CIFAR10(
@@ -34,9 +41,15 @@ test_data = datasets.CIFAR10(
 test_dataloader = DataLoader(test_data, batch_size=batch_size)
 
 
+# These are the classes in the CIFAR-10 dataset, in order
+cifar10_classes = ("plane", "car", "bird", "cat", "deer",
+                   "dog", "frog", "horse", "ship", "truck")
+
+
 #################################
 #           Constants
 #################################
+
 
 # We want to use the CPU for this assessment
 device = "cpu"
@@ -48,12 +61,6 @@ model_save_path = "model.pth"
 # The pictures in the CIFAR-10 datasets are of size 3 * 32 * 32 (3 colours, 32 height, 32 width)
 input_features = 3*32*32
 
-#################################
-#         Training Params
-#################################
-loss_fn = nn.CrossEntropyLoss()
-lr = 1e-2
-epochs = 5
 
 #################################
 #             Model
@@ -61,21 +68,43 @@ epochs = 5
 
 
 class Cifar_NN(nn.Module):
-    def __init__(self,
-                 input_features):
+    def __init__(self):
         super().__init__()
-        self.flatten = nn.Flatten()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(input_features, 512),
+        self.layer_stack = nn.Sequential(
+            # To make this convolutional, we are going to apply convolutional layers
+            # These layers will learn features
+
+            # The number of input channels is 3 because it is a 3-colour image
+            nn.Conv2d(3, 12, 5),
             nn.ReLU(),
-            nn.Linear(512, 512),
+            # By using maxpool, we shrink the image by a facter of kernel size (2)
+            nn.MaxPool2d(2, 2),
+            # The number of input channels here is the number of output channels from above
+            nn.Conv2d(12, 16, 5),
             nn.ReLU(),
-            nn.Linear(512, 10)
+            nn.MaxPool2d(2, 2),
+            # Convolving has occurred >:).
+            # Now that features are learned, we can attempt classification
+
+            # We first need to flatten the tensor
+            nn.Flatten(),
+            # The size of this input layer is fixed based on the properties of our convolution layers
+            # We have shrunk the image multiple times, by having no padding when we convolved, and by using maxpool
+            # We can determine size after a convolution layer using the formula:
+            # (input_width - filter_size + 2*padding) / stride + 1
+            nn.Linear(16*5*5, 120),
+            nn.SiLU(),
+            nn.Linear(120, 256),
+            nn.ReLU(),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 84),
+            nn.ReLU(),
+            nn.Linear(84, 10)
         )
 
     def forward(self, x):
-        x = self.flatten(x)
-        logits = self.linear_relu_stack(x)
+        logits = self.layer_stack(x)
         return logits
 
 
@@ -95,16 +124,16 @@ def train(dataloader: torch.utils.data.DataLoader, model, loss_fn, optimiser) ->
         loss = loss_fn(pred, y)
 
         # Backpropagation
+        optimiser.zero_grad()
         loss.backward()
         optimiser.step()
-        optimiser.zero_grad()
 
-        if batch % 100 == 0:
+        if batch % 2000 == 0:
             loss, current = loss.item(), (batch + 1) * len(X)
             print(f"Loss: {loss:7f} [{current:>5d}/{size:>5d}]")
 
 
-def test(dataloader: torch.utils.data.DataLoader, model, loss_fn) -> None:
+def test(dataloader: torch.utils.data.DataLoader, model, loss_fn) -> float:
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     model.eval()
@@ -118,7 +147,9 @@ def test(dataloader: torch.utils.data.DataLoader, model, loss_fn) -> None:
     test_loss /= num_batches
     correct /= size
     print(
-        f"Test Error:\nAccuracy: {(100*correct):>0.1f}%, Avg loss:{test_loss:>8f} \n")
+        f"Test Error:\nAccuracy: {(100*correct):>0.1f}%, Avg loss:{test_loss:>8f}")
+    print(f"[{"#"*int(100*correct)}{"-"*(100 - int(100*correct))}]")
+    return correct
 
 
 def save_model_weights(model: torch.nn, path: str) -> None:
