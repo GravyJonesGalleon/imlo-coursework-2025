@@ -22,7 +22,7 @@ if __name__ == "__main__":
     start_time = datetime.now()
     for t in range(au.epochs):
         print(
-            f"\nEpoch {t+1:>2d} / {au.epochs:>2d}\n{"_"*28}")
+            f"\nEpoch {t+1:>2d} / {au.epochs:>2d} [{"#" * round(86*((t+1)/au.epochs))}{"-" * round(86*(1-((t+1)/au.epochs)))}]")
 
         epoch_start_time = datetime.now()
 
@@ -34,7 +34,9 @@ if __name__ == "__main__":
 
         print(
             f"Epoch completed in {(epoch_end_time - epoch_start_time)}. Elapsed: {(epoch_end_time - start_time)}")
-        print(f"Improvement of {(accuracies[-1] - accuracies[-2]):0.1f}")
+        improvement = (accuracies[-1] - accuracies[-2])
+        print(
+            f"Improvement of {"\033[92m" if improvement > 0 else "\033[91m"}{improvement:0.1f}\033[00m")
 
     end_time = datetime.now()
     print(f"Done in {end_time - start_time}!")
@@ -45,7 +47,7 @@ if __name__ == "__main__":
         history_file.write(f"{accuracies}\n")
 
     # Plot results
-    plt.scatter(range(0, au.epochs+1), accuracies)
+    plt.scatter(range(1, au.epochs+1), accuracies[1:])
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy / %")
     plt.ylim(0, 100)
