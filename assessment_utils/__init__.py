@@ -13,7 +13,7 @@ from torchvision.transforms import v2
 batch_size = 4
 loss_fn = nn.CrossEntropyLoss()
 learning_rate = 5e-4
-epochs = 25
+epochs = 40
 
 
 #################################
