@@ -10,10 +10,10 @@ from torchvision.transforms import v2
 #       Hyperparameters
 #################################
 
-batch_size = 4
+batch_size = 54
 loss_fn = nn.CrossEntropyLoss()
 learning_rate = 1e-3
-epochs = 30
+epochs = 10
 
 
 #################################
@@ -39,7 +39,7 @@ training_data = datasets.CIFAR10(
         v2.ToImage(),
         v2.RandomHorizontalFlip(p=0.5),
         v2.RandomRotation(30),
-        v2.RandomAdjustSharpness(0.7, p=0.5),
+        v2.RandomAdjustSharpness(0.5, p=0.5),
         v2.ToDtype(torch.float32, scale=True),
         v2.Normalize(cifar_train_means, cifar_train_stdvs)
     ])
@@ -99,43 +99,44 @@ class Cifar_NN(nn.Module):
             # These layers will learn features
 
             # The number of input channels is 3 because it is a 3-colour image
-            nn.ZeroPad2d(2),
-            nn.Conv2d(3, 10, 5),
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            # The number of input channels here is the number of output channels from above
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             # By using maxpool, we shrink the image by a facter of kernel size (2)
             nn.MaxPool2d(2, 2),
-            # We will renormalise the layers
-            nn.BatchNorm2d(10),
-            # The number of input channels here is the number of output channels from above
-            nn.Conv2d(10, 16, 5),
+            # We want to renormalise the data
+            nn.BatchNorm2d(64),
+            # Convolving has occurred >:).
+
+            # This didn't work the first billion times, so let's just make it happen more :]
+
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(2, 2),
-            # Convolving has occurred >:).
-            # Now that features are learned, we can attempt classification
+            nn.BatchNorm2d(128),
+
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),  # We should be down to 4x4 here
+            nn.BatchNorm2d(256),
 
             # We first need to flatten the tensor
             nn.Flatten(),
             # The size of this input layer is fixed based on the properties of our convolution layers
-            # We have shrunk the image multiple times, by having no padding when we convolved, and by using maxpool
+            # We have shrunk the image multiple times, (formely by having no padding when we convolved), and now by using maxpool
             # We can determine size after a convolution layer using the formula:
             # (input_width - filter_size + 2*padding) / stride + 1
-            nn.Linear(16*6*6, 120),
+            nn.Linear(256*4*4, 1024),
             nn.ReLU(),
-            # Not having this was 67%
-            nn.BatchNorm1d(120),
-            nn.Linear(120, 500),
+            nn.Linear(1024, 512),
             nn.ReLU(),
-            nn.Linear(500, 500),
-            nn.ReLU(),
-            nn.Linear(500, 500),
-            nn.ReLU(),
-            nn.BatchNorm1d(500),
-            nn.Linear(500, 500),
-            nn.ReLU(),
-            nn.Linear(500, 500),
-            nn.ReLU(),
-            nn.BatchNorm1d(500),
-            nn.Linear(500, 10)
+            nn.Linear(512, 10),
         )
 
     def forward(self, x):
@@ -150,6 +151,7 @@ class Cifar_NN(nn.Module):
 
 def train(dataloader: torch.utils.data.DataLoader, model, loss_fn, optimiser) -> None:
     size = len(dataloader.dataset)
+    numbatches = size // batch_size
     model.train()
     for batch, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
@@ -159,11 +161,11 @@ def train(dataloader: torch.utils.data.DataLoader, model, loss_fn, optimiser) ->
         loss = loss_fn(pred, y)
 
         # Backpropagation
-        optimiser.zero_grad()
         loss.backward()
         optimiser.step()
+        optimiser.zero_grad()
 
-        if batch % 2000 == 0:
+        if batch % (numbatches // 10) == 0:
             loss, current = loss.item(), (batch + 1) * len(X)
             print(f"Loss: {loss:7f} [{current:>5d}/{size:>5d}]")
 

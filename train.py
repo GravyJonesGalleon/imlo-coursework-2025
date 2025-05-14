@@ -15,7 +15,11 @@ if __name__ == "__main__":
     model = au.Cifar_NN().to(au.device)
     # print(model)
 
-    optimiser = torch.optim.SGD(model.parameters(), lr=au.learning_rate)
+    # THIS WAS GIVING ME SO MANY HEADACHES
+    # ADAM BLOWS SGD OUT OF THE WATER!
+    # WOOOOO
+    optimiser = torch.optim.Adam(
+        model.parameters(), lr=au.learning_rate, weight_decay=0.0005)
 
     # Perform the training
     accuracies = [0]
@@ -36,7 +40,7 @@ if __name__ == "__main__":
             f"Epoch completed in {(epoch_end_time - epoch_start_time)}. Elapsed: {(epoch_end_time - start_time)}")
         improvement = (accuracies[-1] - accuracies[-2])
         print(
-            f"Improvement of {"\033[92m" if improvement > 0 else "\033[91m"}{improvement:0.1f}\033[00m")
+            f"Improvement of {"\033[92m" if improvement > 0 else "\033[91m\a"}{improvement:0.1f}\033[00m%")
 
     end_time = datetime.now()
     print(f"Done in {end_time - start_time}!")
