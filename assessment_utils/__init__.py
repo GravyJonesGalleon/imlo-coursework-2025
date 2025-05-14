@@ -3,7 +3,7 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets
-from torchvision import transforms
+from torchvision.transforms import v2
 
 
 #################################
@@ -12,8 +12,8 @@ from torchvision import transforms
 
 batch_size = 4
 loss_fn = nn.CrossEntropyLoss()
-learning_rate = 2e-3
-epochs = 20
+learning_rate = 5e-4
+epochs = 25
 
 
 #################################
@@ -35,20 +35,26 @@ training_data = datasets.CIFAR10(
     root="data",
     train=True,
     download=True,
-    transform=transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(cifar_train_means, cifar_train_stdvs)])
+    transform=v2.Compose([
+        v2.ToImage(),
+        v2.RandomHorizontalFlip(p=0.5),
+        v2.RandomRotation(30),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(cifar_train_means, cifar_train_stdvs)
+    ])
 )
 
-train_dataloader = DataLoader(training_data, batch_size=batch_size)
+train_dataloader = DataLoader(
+    training_data, batch_size=batch_size, shuffle=True)
 
 test_data = datasets.CIFAR10(
     root="data",
     train=False,
     download=True,
-    transform=transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(cifar_train_means, cifar_train_stdvs)
+    transform=v2.Compose([
+        v2.ToImage(),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(cifar_train_means, cifar_train_stdvs)
     ])
 )
 
@@ -92,15 +98,15 @@ class Cifar_NN(nn.Module):
             # These layers will learn features
 
             # The number of input channels is 3 because it is a 3-colour image
-            # nn.ZeroPad2d(2),
-            nn.Conv2d(3, 6, 5),
+            nn.ZeroPad2d(2),
+            nn.Conv2d(3, 10, 5),
             nn.ReLU(),
             # By using maxpool, we shrink the image by a facter of kernel size (2)
             nn.MaxPool2d(2, 2),
             # We will renormalise the layers
-            nn.BatchNorm2d(6),
+            nn.BatchNorm2d(10),
             # The number of input channels here is the number of output channels from above
-            nn.Conv2d(6, 12, 5),
+            nn.Conv2d(10, 16, 5),
             nn.ReLU(),
             nn.MaxPool2d(2, 2),
             # Convolving has occurred >:).
@@ -112,13 +118,17 @@ class Cifar_NN(nn.Module):
             # We have shrunk the image multiple times, by having no padding when we convolved, and by using maxpool
             # We can determine size after a convolution layer using the formula:
             # (input_width - filter_size + 2*padding) / stride + 1
-            nn.Linear(12*5*5, 120),
+            nn.Linear(16*6*6, 120),
             nn.ReLU(),
-            nn.BatchNorm1d(120),
-            nn.Linear(120, 286),
+            # Not having this was 67%
+            # nn.BatchNorm1d(120),
+            nn.Linear(120, 500),
             nn.ReLU(),
-            nn.Linear(286, 84),
+            nn.Linear(500, 500),
             nn.ReLU(),
+            nn.Linear(500, 84),
+            nn.ReLU(),
+            # nn.BatchNorm1d(84),
             nn.Linear(84, 10)
         )
 
@@ -168,7 +178,7 @@ def test(dataloader: torch.utils.data.DataLoader, model, loss_fn) -> float:
     print(
         f"Test Error:\nAccuracy: {(100*correct):>0.1f}%, Avg loss:{test_loss:>8f}")
     print(
-        f"[\033[92m{"#"*int(100*correct)}\033[91m{"-"*(100 - int(100*correct))}\033[00m]")
+        f"[\033[92m{"#"*int(100*correct)}\033[91m{"="*(100 - int(100*correct))}\033[00m]")
     return correct
 
 
