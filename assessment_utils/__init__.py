@@ -12,8 +12,8 @@ from torchvision.transforms import v2
 
 batch_size = 4
 loss_fn = nn.CrossEntropyLoss()
-learning_rate = 5e-4
-epochs = 40
+learning_rate = 1e-3
+epochs = 30
 
 
 #################################
@@ -39,6 +39,7 @@ training_data = datasets.CIFAR10(
         v2.ToImage(),
         v2.RandomHorizontalFlip(p=0.5),
         v2.RandomRotation(30),
+        v2.RandomAdjustSharpness(0.7, p=0.5),
         v2.ToDtype(torch.float32, scale=True),
         v2.Normalize(cifar_train_means, cifar_train_stdvs)
     ])
@@ -121,15 +122,20 @@ class Cifar_NN(nn.Module):
             nn.Linear(16*6*6, 120),
             nn.ReLU(),
             # Not having this was 67%
-            # nn.BatchNorm1d(120),
+            nn.BatchNorm1d(120),
             nn.Linear(120, 500),
             nn.ReLU(),
             nn.Linear(500, 500),
             nn.ReLU(),
-            nn.Linear(500, 84),
+            nn.Linear(500, 500),
             nn.ReLU(),
-            # nn.BatchNorm1d(84),
-            nn.Linear(84, 10)
+            nn.BatchNorm1d(500),
+            nn.Linear(500, 500),
+            nn.ReLU(),
+            nn.Linear(500, 500),
+            nn.ReLU(),
+            nn.BatchNorm1d(500),
+            nn.Linear(500, 10)
         )
 
     def forward(self, x):
