@@ -13,7 +13,7 @@ from torchvision.transforms import v2
 batch_size = 54
 loss_fn = nn.CrossEntropyLoss()
 learning_rate = 1e-3
-epochs = 10
+epochs = 15
 
 
 #################################
@@ -167,7 +167,8 @@ def train(dataloader: torch.utils.data.DataLoader, model, loss_fn, optimiser) ->
 
         if batch % (numbatches // 10) == 0:
             loss, current = loss.item(), (batch + 1) * len(X)
-            print(f"Loss: {loss:7f} [{current:>5d}/{size:>5d}]")
+            print(
+                f"Loss: {loss:7f} [{current:>5d}/{size:>5d},{(100*current/size):3.0f}%]")
 
 
 def test(dataloader: torch.utils.data.DataLoader, model, loss_fn) -> float:
@@ -190,7 +191,9 @@ def test(dataloader: torch.utils.data.DataLoader, model, loss_fn) -> float:
     return correct
 
 
-def save_model_weights(model: torch.nn, path: str) -> None:
+def save_model_weights(model: torch.nn, path: str, accuracy=0) -> None:
+    if (accuracy > 80):
+        path = f"{accuracy:.0f}pc-{path}"
     torch.save(model.state_dict(), path)
     print(f"Saved PyTorch Model State to {path}")
 

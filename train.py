@@ -1,6 +1,5 @@
 import assessment_utils as au
 import matplotlib.pyplot as plt
-import json
 from datetime import datetime
 import torch
 
@@ -40,12 +39,12 @@ if __name__ == "__main__":
             f"Epoch completed in {(epoch_end_time - epoch_start_time)}. Elapsed: {(epoch_end_time - start_time)}")
         improvement = (accuracies[-1] - accuracies[-2])
         print(
-            f"Improvement of {"\033[92m" if improvement > 0 else "\033[91m\a"}{improvement:0.1f}\033[00m%")
+            f"Improvement of {"\033[92m" if improvement > 0 else "\033[91m\a"}{improvement:0.1f}%\033[00m")
 
     end_time = datetime.now()
     print(f"Done in {end_time - start_time}!")
 
-    au.save_model_weights(model, au.model_save_path)
+    au.save_model_weights(model, au.model_save_path, accuracies[-1])
 
     with open("history.txt", "a") as history_file:
         history_file.write(f"{accuracies}\n")
@@ -55,4 +54,4 @@ if __name__ == "__main__":
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy / %")
     plt.ylim(0, 100)
-    plt.show()
+    # plt.show()
