@@ -1,63 +1,57 @@
+import assessment_utils as au
+import matplotlib.pyplot as plt
+from datetime import datetime
 import torch
-from torch import nn
-from torch.utils.data import DataLoader
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 
-# We want to use the CIFAR-10 dataset to train the data.
-training_data = datasets.CIFAR10(
-    root="data",
-    train=True,
-    download=True,
-    transform=ToTensor()
-)
+if __name__ == "__main__":
+    # Printing the shape of the dataset allows you to know the number of input features
+    # for X, y in au.train_dataloader:
+    #     print(f"Shape of X [N, C, H, W]: {X.shape}")
+    #     print(f"Shape of y: {y.shape} {y.dtype}")
+    #     break
 
-# What is batch size? TODO: Look tha shit up.
-batch_size = 64
+    # Instantiate the model
+    model = au.Cifar_NN().to(au.device)
+    # print(model)
 
-train_dataloader = DataLoader(training_data, batch_size=batch_size)
+    # THIS WAS GIVING ME SO MANY HEADACHES
+    # ADAM BLOWS SGD OUT OF THE WATER!
+    # WOOOOO
+    optimiser = torch.optim.Adam(
+        model.parameters(), lr=au.learning_rate, weight_decay=0.0005)
 
+    # Perform the training
+    accuracies = [0]
+    start_time = datetime.now()
+    for t in range(au.epochs):
+        print(
+            f"\nEpoch {t+1:>2d} / {au.epochs:>2d} [{"#" * round(86*((t+1)/au.epochs))}{"-" * round(86*(1-((t+1)/au.epochs)))}]")
 
-class cifar_NN(nn.Module):
-    def __init__(self,
-                 input_features: int,
-                 hidden_layer_features: list[int],
-                 output_features: int,
-                 activation_function: function):
-        super().__init__()
+        epoch_start_time = datetime.now()
 
-        # We want to make sure that the layers entered are valid before we create them
-        if (input_features < 1):
-            raise Exception(
-                "The neural network needs at least one input feature")
-        if (len(hidden_layer_features) < 1):
-            raise Exception(
-                "The neural network needs at least one hidden layer")
+        au.train(au.train_dataloader, model, au.loss_fn, optimiser)
+        correct = au.test(au.test_dataloader, model, au.loss_fn)
+        accuracies.append(100*correct)
 
-        # We want to keep track of all our layers :)
-        self.layers = []
+        epoch_end_time = datetime.now()
 
-        self.layers[0] = nn.Linear(input_features, hidden_layer_features[0])
-        self.add_module("input_layer", self.layers[0])
-        for i in range(1, len(hidden_layer_features)):
-            self.layers.append(
-                nn.Linear(hidden_layer_features[i - 1], hidden_layer_features[i]))
-            self.add_module(f"hidden_layer{i}", self.layers[i])
+        print(
+            f"Epoch completed in {(epoch_end_time - epoch_start_time)}. Elapsed: {(epoch_end_time - start_time)}")
+        improvement = (accuracies[-1] - accuracies[-2])
+        print(
+            f"Improvement of {"\033[92m" if improvement > 0 else "\033[91m\a"}{improvement:0.1f}%\033[00m")
 
-        # Set the output layer
-        self.out = nn.Linear(hidden_layer_features[-1], output_features)
+    end_time = datetime.now()
+    print(f"Done in {end_time - start_time}!")
 
-        self.activation = activation_function
+    au.save_model_weights(model, au.model_save_path, accuracies[-1])
 
-    def forward(self, x):
-        for i in range(len(self.layers)):
-            x = self.activation(self.layers[i](x))
-        return self.out(x)
+    with open("history.txt", "a") as history_file:
+        history_file.write(f"{accuracies}\n")
 
-
-# Instantiate the model
-classifier = cifar_NN(input_features=4,
-                      hidden_layer_features=[16, 8],
-                      output_features=3,
-                      activation_function=nn.ReLU
-                      )
+    # Plot results
+    plt.scatter(range(1, au.epochs+1), accuracies[1:])
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy / %")
+    plt.ylim(0, 100)
+    # plt.show()

@@ -1,0 +1,8 @@
+name: imlo
+dependencies:
+  - python=3.13.2
+  - matplotlib
+  - pip
+  - pip:
+      - torch
+      - torchvision

@@ -1,0 +1,10 @@
+# Ignore the data files
+data/
+
+__pycache__
+./assessment_utils/__pycache__/
+
+model.pth
+
+history.txt
+plot_history.py
