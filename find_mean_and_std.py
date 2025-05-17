@@ -1,7 +1,6 @@
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms
-import numpy
 
 training_data = datasets.CIFAR10(
     root="data",
