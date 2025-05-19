@@ -1,3 +1,7 @@
+"""
+find_mean_and_std loads the CIFAR-10 training dataset and calculates the mean and standard deviation of each colour channel.
+"""
+
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms
