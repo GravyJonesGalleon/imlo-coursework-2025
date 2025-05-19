@@ -6,6 +6,7 @@ __pycache__
 
 # The default save file, changes frequently
 model.pth
+*model.pth
 
 # My analytics file/program
 history.txt
