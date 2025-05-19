@@ -10,6 +10,8 @@ The following is a list of the submitted files and their purposes.
 - `train.py`: runs the training code and saves the trained model to the file determined by `network_utils.Constants.MODEL_SAVE_FILE`.
 - `test.py`: loads the model weights from the file determined by `network_utils.Constants.MODEL_SAVE_FILE` and tests it against the test set.
 - `find_mean_and_std.py`: used to find the mean and standard deviation of the training data for normalisation.
+- `model.pth`: the default save file for trained models. Upon unzipping, this will be the same as `final83model.pth`.
+- `final83model.pth`: a backup copy of `model.pth` that acheives 82.6% on the CIFAR-10 test dataset, to test using this file, it either needs to be renamed, or the value of the `MODEL_SAVE_FILE` should be updated. 
 
 ## Using the submission
 To run the program, ensure that the `imlo` conda environment is enabled.
