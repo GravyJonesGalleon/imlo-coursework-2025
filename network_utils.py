@@ -41,7 +41,7 @@ class Hyperparameters():
     BATCH_SIZE = 64
     """The size of each batch provided by the dataloader."""
 
-    _VALIDATION_FRACTION = 0.1
+    _VALIDATION_FRACTION = 0.05
     """The fraction in range [0, 1] of the training dataset to be set aside for validation."""
 
     VALIDATION_RATIO = (1 - _VALIDATION_FRACTION, _VALIDATION_FRACTION)
@@ -118,7 +118,9 @@ class Cifar10_NN(nn.Module):
             nn.ReLU(),
             nn.Linear(1024, 512),
             nn.ReLU(),
-            nn.Linear(512, 10),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 10)
         )
 
     def forward(self, x):
