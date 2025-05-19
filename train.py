@@ -1,57 +1,144 @@
-import assessment_utils as au
-import matplotlib.pyplot as plt
-from datetime import datetime
+"""
+The program trains the neural network and saves the trained model to a file.
+"""
+
+# For training the Neural Network
 import torch
+from torch import nn
+from torch.utils.data import random_split
+from torch.utils.data import DataLoader
+from torchvision import datasets
+from torchvision.transforms import v2
+
+# Shared constants, the model, and utility functions
+from network_utils import Program_Constants as constants
+from network_utils import Hyperparameters as hyperparams
+from network_utils import Utility_Functions as uf
+from network_utils import Cifar10_NN
+
+# For visualising training progress
+from datetime import datetime
+from matplotlib import pyplot as plt
+
+
+def train(dataloader: torch.utils.data.DataLoader, model: Cifar10_NN, loss_fn, optimiser: torch.optim.Optimizer) -> None:
+    """Run a training loop over the entire dataset provided by the dataloader.
+
+    Args:
+        dataloader (torch.utils.data.DataLoader): A dataloader managing the dataset for training.
+        model (Cifar10_NN): The neural network learning model to be trained.
+        loss_fn (loss function): The criterion for the optimiser to minimise.
+        optimiser (torch.optim.Optimizer): The optimisation function to use.
+    """
+    size = len(dataloader.dataset)
+    numbatches = size // hyperparams.BATCH_SIZE
+    model.train()
+
+    for batch, (X, y) in enumerate(dataloader):
+        X, y = X.to(constants.DEVICE), y.to(constants.DEVICE)
+
+        # Compute prediction error
+        pred = model(X)
+        loss = loss_fn(pred, y)
+
+        # Backpropagation
+        loss.backward()
+        optimiser.step()
+        optimiser.zero_grad()
+
+        if batch % (numbatches // 10) == 0:
+            loss, current = loss.item(), (batch + 1) * len(X)
+            print(
+                f"Loss: {loss:7f} [{current:>5d}/{size:>5d},{(100*current/size):3.0f}%]")
+
+
+def validate(dataloader: torch.utils.data.DataLoader, model: Cifar10_NN, loss_fn) -> float:
+    """Tests the data using a dataset provided, producing an accuracy score.
+
+    Args:
+        dataloader (torch.utils.data.DataLoader): A dataloader managing the dataset for testing.
+        model (Cifar10_NN): The neural network learning model to be tested.
+        loss_fn (loss function): The criterion.
+
+    Returns:
+        accuracy (float): The accuracy of the model, as a percentage 
+    """
+    size = len(dataloader.dataset)
+    num_batches = len(dataloader)
+    model.eval()
+    test_loss, correct = 0, 0
+    with torch.no_grad():
+        for X, y in dataloader:
+            X, y = X.to(constants.DEVICE), y.to(constants.DEVICE)
+            pred = model(X)
+            test_loss += loss_fn(pred, y).item()
+            correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+    test_loss /= num_batches
+    accuracy = 100 * correct / size
+    uf.print_accuracy(accuracy, test_loss)
+    return accuracy
+
 
 if __name__ == "__main__":
-    # Printing the shape of the dataset allows you to know the number of input features
-    # for X, y in au.train_dataloader:
-    #     print(f"Shape of X [N, C, H, W]: {X.shape}")
-    #     print(f"Shape of y: {y.shape} {y.dtype}")
-    #     break
+    all_training_data = datasets.CIFAR10(
+        root="data",
+        train=True,
+        download=True,
+        transform=v2.Compose([
+            v2.ToImage(),
+            v2.RandomHorizontalFlip(p=0.5),
+            v2.RandomRotation(30),
+            v2.RandomAdjustSharpness(0.5, p=0.5),
+            v2.ToDtype(torch.float32, scale=True),
+            v2.Normalize(constants.CIFAR10_TRAIN_MEANS,
+                         constants.CIFAR10_TRAIN_STDVS)
+        ])
+    )
+    training_data, validation_data = random_split(
+        all_training_data, hyperparams.VALIDATION_RATIO)
+
+    # Create dataloaders from the datasets
+    train_dataloader = DataLoader(
+        training_data, batch_size=hyperparams.BATCH_SIZE, shuffle=True)
+    validation_dataloader = DataLoader(
+        validation_data, batch_size=hyperparams.BATCH_SIZE, shuffle=True)
 
     # Instantiate the model
-    model = au.Cifar_NN().to(au.device)
-    # print(model)
+    model = Cifar10_NN().to(constants.DEVICE)
 
-    # THIS WAS GIVING ME SO MANY HEADACHES
-    # ADAM BLOWS SGD OUT OF THE WATER!
-    # WOOOOO
+    # Instantiate the loss functions and optimiser
+    loss_fn = nn.CrossEntropyLoss()
     optimiser = torch.optim.Adam(
-        model.parameters(), lr=au.learning_rate, weight_decay=0.0005)
+        model.parameters(), lr=hyperparams.LEARNING_RATE, weight_decay=hyperparams.WEIGHT_DECAY)
 
-    # Perform the training
+    # Accuracies are saved as histories for progess viewing purposes
+    # Start time is logged to see the time the training has taken
     accuracies = [0]
     start_time = datetime.now()
-    for t in range(au.epochs):
-        print(
-            f"\nEpoch {t+1:>2d} / {au.epochs:>2d} [{"#" * round(86*((t+1)/au.epochs))}{"-" * round(86*(1-((t+1)/au.epochs)))}]")
-
+    # Perform the training
+    for t in range(hyperparams.NUM_EPOCHS):
+        uf.print_training_progress(t, hyperparams.NUM_EPOCHS)
         epoch_start_time = datetime.now()
 
-        au.train(au.train_dataloader, model, au.loss_fn, optimiser)
-        correct = au.test(au.test_dataloader, model, au.loss_fn)
-        accuracies.append(100*correct)
+        train(train_dataloader, model, loss_fn, optimiser)
+        accuracy = validate(validation_dataloader, model, loss_fn)
+        accuracies.append(accuracy)
 
         epoch_end_time = datetime.now()
-
-        print(
-            f"Epoch completed in {(epoch_end_time - epoch_start_time)}. Elapsed: {(epoch_end_time - start_time)}")
-        improvement = (accuracies[-1] - accuracies[-2])
-        print(
-            f"Improvement of {"\033[92m" if improvement > 0 else "\033[91m\a"}{improvement:0.1f}%\033[00m")
+        uf.print_epoch_summary(start_time,
+                               epoch_start_time,
+                               epoch_end_time,
+                               accuracies[-2],
+                               accuracies[-1])
 
     end_time = datetime.now()
     print(f"Done in {end_time - start_time}!")
 
-    au.save_model_weights(model, au.model_save_path, accuracies[-1])
-
-    with open("history.txt", "a") as history_file:
-        history_file.write(f"{accuracies}\n")
+    uf.save_model_weights(model, constants.MODEL_SAVE_PATH, accuracies[-1])
 
     # Plot results
-    plt.scatter(range(1, au.epochs+1), accuracies[1:])
+    plt.scatter(range(1, hyperparams.NUM_EPOCHS+1), accuracies[1:])
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy / %")
     plt.ylim(0, 100)
-    # plt.show()
+    plt.show()
