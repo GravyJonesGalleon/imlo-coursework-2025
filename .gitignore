@@ -1,10 +1,12 @@
-# Ignore the data files
+# Ignore the CIFAR-10 data files
 data/
 
 __pycache__
 ./assessment_utils/__pycache__/
 
+# The default save file, changes frequently
 model.pth
 
+# My analytics file/program
 history.txt
 plot_history.py
